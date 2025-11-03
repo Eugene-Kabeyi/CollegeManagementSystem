@@ -1,12 +1,17 @@
 <?php
 include_once('../../config.php');
 $action = $_POST['action'];
+
 if($action=='fetch_staff_data')
 {
 	$department_code = $_POST['department_code'];
 	$staffs = array(); $staff = array();
-	$sql_staff = mysql_query("SELECT * FROM login_staff WHERE department = '$department_code' ORDER BY type DESC, joining_date ASC");
-	while($row_staff=mysql_fetch_array($sql_staff))
+	
+	$stmt = $conn->prepare("SELECT * FROM login_staff WHERE department = :department_code ORDER BY type DESC, joining_date ASC");
+	$stmt->bindParam(':department_code', $department_code);
+	$stmt->execute();
+	
+	while($row_staff = $stmt->fetch(PDO::FETCH_ASSOC))
 	{
 		$staff['code'] = $row_staff['userid'];
 		$staff['name'] = $row_staff['name'];
@@ -19,48 +24,70 @@ else if($action=='fetch_department_data')
 {
 	$department_code = $_POST['department_code'];
 	$programs=array();
-	$sql = mysql_query("SELECT * FROM `courses` WHERE department_code='$department_code' ORDER BY id DESC");
-	while($row=mysql_fetch_array($sql))
+	
+	$stmt = $conn->prepare("SELECT * FROM `courses` WHERE department_code= :department_code ORDER BY id DESC");
+	$stmt->bindParam(':department_code', $department_code);
+	$stmt->execute();
+	
+	while($row = $stmt->fetch(PDO::FETCH_ASSOC))
 	{
   		array_push($programs,$row['program_name']);	
 	}
-$programs = array_unique($programs);
-$programs = json_encode($programs);
-echo $programs;
+	$programs = array_unique($programs);
+	$programs = json_encode($programs);
+	echo $programs;
 }
 else if($action=='fetch_course_data')
 {
 	$department_code = $_POST['department_code'];
 	$department_program = $_POST['department_program'];
 	$courses = array(); $course = array(); $scheme= array(); $Course_Data = array(); $semester = array(); $yoa=array();
+	
 	//Courses
-	$sql = mysql_query("SELECT * FROM `courses` WHERE department_code='$department_code' AND program_name='$department_program' ORDER BY id DESC");
-	while($row=mysql_fetch_array($sql))
+	$stmt = $conn->prepare("SELECT * FROM `courses` WHERE department_code= :department_code AND program_name= :department_program ORDER BY id DESC");
+	$stmt->bindParam(':department_code', $department_code);
+	$stmt->bindParam(':department_program', $department_program);
+	$stmt->execute();
+	
+	while($row = $stmt->fetch(PDO::FETCH_ASSOC))
 	{
 		$course['name'] = $row['course_name'];
 		$course['code'] = $row['course_code'];
 		array_push($courses,$course);
 	}
 	$Course_Data['courses']= $courses;
-	//Acadamic Scheme
-	$sql_scheme = mysql_query("SELECT DISTINCT university_scheme FROM `academic_data` WHERE current_semester!='0' AND course='$department_program' ORDER BY id DESC");
-	while($row_scheme=mysql_fetch_array($sql_scheme))
+	
+	//Academic Scheme
+	$stmt_scheme = $conn->prepare("SELECT DISTINCT university_scheme FROM `academic_data` WHERE current_semester!='0' AND course= :department_program ORDER BY id DESC");
+	$stmt_scheme->bindParam(':department_program', $department_program);
+	$stmt_scheme->execute();
+	
+	while($row_scheme = $stmt_scheme->fetch(PDO::FETCH_ASSOC))
 	{
 		array_push($scheme,$row_scheme['university_scheme']);
 	}
 	sort($scheme);
 	$Course_Data['scheme']= $scheme;
+	
 	//Year of Admission
-	$sql_yoa = mysql_query("SELECT DISTINCT admission_year FROM `academic_data` WHERE course='$department_program' ORDER BY id DESC");
-	while($row_yoa=mysql_fetch_array($sql_yoa))
+	$stmt_yoa = $conn->prepare("SELECT DISTINCT admission_year FROM `academic_data` WHERE course= :department_program ORDER BY id DESC");
+	$stmt_yoa->bindParam(':department_program', $department_program);
+	$stmt_yoa->execute();
+	
+	while($row_yoa = $stmt_yoa->fetch(PDO::FETCH_ASSOC))
 	{
 		array_push($yoa,$row_yoa['admission_year']);
 	}
 	sort($yoa);
 	$Course_Data['yoa']= $yoa;
+	
 	//Semester
-	$sql_semester = mysql_query("SELECT * FROM `courses` WHERE department_code='$department_code' AND program_name='$department_program' ORDER BY id DESC LIMIT 1");
-	while($row_semester=mysql_fetch_array($sql_semester))
+	$stmt_semester = $conn->prepare("SELECT * FROM `courses` WHERE department_code= :department_code AND program_name= :department_program ORDER BY id DESC LIMIT 1");
+	$stmt_semester->bindParam(':department_code', $department_code);
+	$stmt_semester->bindParam(':department_program', $department_program);
+	$stmt_semester->execute();
+	
+	while($row_semester = $stmt_semester->fetch(PDO::FETCH_ASSOC))
 	{
 		array_push($semester,$row_semester['course_semester']);
 	}
@@ -74,17 +101,23 @@ else if($action=='fetch_batch_data')
 	$course_code = $_POST['course_code'];
 	$course_department = $_POST['course_department'];
 	$course_program = $_POST['course_program'];
-	$batch = mysql_query("SELECT * FROM `courses` WHERE course_code='$course_code' AND department_code='$course_department' AND program_name='$course_program'");
-	while($row_batch = mysql_fetch_array($batch))
+	
+	$stmt = $conn->prepare("SELECT * FROM `courses` WHERE course_code= :course_code AND department_code= :course_department AND program_name= :course_program");
+	$stmt->bindParam(':course_code', $course_code);
+	$stmt->bindParam(':course_department', $course_department);
+	$stmt->bindParam(':course_program', $course_program);
+	$stmt->execute();
+	
+	$result = array();
+	while($row_batch = $stmt->fetch(PDO::FETCH_ASSOC))
 	{
 		$result['batch'] = $row_batch['course_batch'];
 	}
-	if($result['batch'])
+	if(isset($result['batch']))
 	 {
 		 $result = json_encode($result);
 		 echo $result;
 	 }
-
 }
 else if($action=='fetch_subject_data')
 {
@@ -254,7 +287,7 @@ function AddNewSubject() {
 	{
 		$.ajax({
 		type: "POST",
-		url: "/online/dashboard_page/forms/subject_management_form.php",
+		url: "dashboard_page/forms/subject_management_form.php",
 		beforeSend: function() {$('#Spinner1').removeClass('hidden'); $("#AddNewSubject-Form").addClass('hidden');},
 		data: {
 			"department":department,
@@ -296,7 +329,7 @@ function AddNewSubject() {
 function RealTimeDataSubject (program,course_code,scheme,semester,department) {
 $.ajax({
 		type: "POST",
-		url: "/online/dashboard_page/realtime_data.php",
+		url: "dashboard_page/realtime_data.php",
 		data: {
 		"program": program,
 		"course_code": course_code,
@@ -386,8 +419,9 @@ else if($action=='fetch_subject_staff_data')
                     <select name="allot-staff-department-other" id="allot-staff-department-other" class="form-control">
                       <option value="null" selected="selected">Select a Department</option>
                       <?php
-						 $Department = mysql_query("SELECT * FROM `department`");
-						 while ($row=mysql_fetch_array($Department))
+						 $stmt = $conn->prepare("SELECT * FROM `department`");
+						 $stmt->execute();
+						 while ($row = $stmt->fetch(PDO::FETCH_ASSOC))
 						 {
 					 		echo '<option value="'.$row['department_code'].'">'.$row['department_name'].'</option>';
 						 }
@@ -439,7 +473,7 @@ fetch_staff_data();
 function fetch_staff_data () {
 	$.ajax({
 	type: "POST",
-	url: "/online/dashboard_page/forms/fetch.php",
+	url: "dashboard_page/forms/fetch.php",
 	data: {"department_code": $("#allot-staff-department-other").val(),
 	"action": "fetch_staff_data"},
 	dataType: "json",
@@ -483,7 +517,7 @@ function AllotTeacher() {
  {
 	$.ajax({
 		type: "POST",
-		url: "/online/dashboard_page/forms/subject_management_form.php",
+		url: "dashboard_page/forms/subject_management_form.php",
 		beforeSend: function() {$('#Spinner3').removeClass('hidden'); $("#AllotStaff-Form").addClass('hidden'); $("#AllotTeacher-warning").addClass('hidden');},
 		data: {
 		"program_name": program_name,
@@ -522,7 +556,7 @@ function AllotTeacher() {
 function RealTimeDataAllotment (program,course_code,scheme,batch,semester,department) {
 $.ajax({
 		type: "POST",
-		url: "/online/dashboard_page/realtime_data.php",
+		url: "dashboard_page/realtime_data.php",
 		data: {
 		"program": program,
 		"course_code": course_code,
