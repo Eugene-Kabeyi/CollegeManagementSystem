@@ -10,7 +10,7 @@
         </ul>
       </div>
       <div class="col-md-6 text-right copyright">
-       Developed by <a href="#">Technology Incubator CEA</a>
+       Developed by <a href="#"></a>
       </div>
     </div>
   </div>
