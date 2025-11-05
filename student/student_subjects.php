@@ -167,7 +167,7 @@ $has_subjects = count($subjects) > 0;
                 <i class="fas fa-graduation-cap"></i> CEA Student Portal
             </a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="student_dashboard.php">
+                <a class="nav-link" href="../student_dashboard.php">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
                 <a class="nav-link" href="../logout.php">
@@ -271,7 +271,7 @@ $has_subjects = count($subjects) > 0;
                                     <button type="submit" name="register_subjects" class="btn btn-success btn-lg">
                                         <i class="fas fa-save"></i> Register Selected Subjects
                                     </button>
-                                    <a href="student_dashboard.php" class="btn btn-secondary btn-lg">
+                                    <a href="../student_dashboard.php" class="btn btn-secondary btn-lg">
                                         <i class="fas fa-arrow-left"></i> Back to Dashboard
                                     </a>
                                 </div>
@@ -284,7 +284,7 @@ $has_subjects = count($subjects) > 0;
                                 <small class="text-muted">Please contact your department if this seems incorrect.</small>
                             </div>
                             <div class="text-center">
-                                <a href="student_dashboard.php" class="btn btn-primary">
+                                <a href="../student_dashboard.php" class="btn btn-primary">
                                     <i class="fas fa-arrow-left"></i> Back to Dashboard
                                 </a>
                             </div>

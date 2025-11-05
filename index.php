@@ -27,6 +27,13 @@ if (isset($_GET['login-error'])) {
         case 'csrf':
             $errorMessage = "Security token invalid. Please try again.";
             break;
+        case 'locked':
+            $minutes = $_GET['minutes'] ?? 30;
+            $errorMessage = "Your account has been locked due to too many failed attempts. Please try again in {$minutes} minutes.";
+            break;
+        case 'mfa_attempts':
+            $errorMessage = "Maximum verification attempts reached. Your account has been locked.";
+            break;
         default:
             $errorMessage = "Login failed. Please try again.";
             break;

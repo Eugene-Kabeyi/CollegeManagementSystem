@@ -49,24 +49,25 @@ include_once(__DIR__ . '/config.php'); // This should define $conn, not $pdo
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="#">CEA Student Portal</a>
-            <div class="navbar-nav ms-auto">
-                <span class="navbar-text me-3">Welcome, <?php echo htmlspecialchars($student_name); ?></span>
-                <a class="nav-link" href="logout.php">Logout</a>
+            <a class="navbar-brand" href="#"><i class="fas fa-graduation-cap"></i>CEA Student Portal</a>
+            <div class="navbar-nav ms-auto ">
+                <span class="navbar-text me-3 ">Welcome, <?php echo htmlspecialchars($student_name); ?></span>
+                <a class="nav-link text-danger" href="logout.php"> <i class="fas fa-sign-out-alt"></i>Logout</a>
             </div>
         </div>
     </nav>
 
     <div class="container mt-4">
         <div class="row">
-            <div class="col-md-3 mb-4">
+            <div class="col-md-6 mb-4">
                 <div class="card dashboard-card text-white bg-primary">
                     <div class="card-body text-center">
                         <h5><i class="fas fa-user"></i> Profile</h5>
                         <a href="student/student_profile.php" class="stretched-link text-white text-decoration-none"></a>
                     </div>
                 </div>
-            <div class="col-md-3 mb-4">
+    </div>
+            <div class="col-md-6 mb-4">
                 <div class="card dashboard-card text-white bg-warning">
                     <div class="card-body text-center">
                         <h5><i class="fas fa-book"></i> Subjects</h5>

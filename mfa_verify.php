@@ -15,6 +15,20 @@ if (!isset($_SESSION['mfa_pending_user'])) {
     exit();
 }
 
+// Check if account is locked before proceeding
+$lockout_status = MFAHelper::getLockoutStatus(
+    $conn, 
+    $_SESSION['mfa_pending_user']['userid'], 
+    $_SESSION['mfa_pending_user']['email'], 
+    $_SESSION['mfa_pending_user']['role']
+);
+
+if ($lockout_status['locked']) {
+    error_log("MFA BLOCKED: Account is locked - redirecting to index");
+    header('Location: index.php?login-error=locked&minutes=' . $lockout_status['minutes_remaining']);
+    exit();
+}
+
 // Check if MFA code exists
 if (!isset($_SESSION['mfa_code'])) {
     error_log("MFA FAIL: No MFA code in session");
@@ -165,7 +179,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         error_log("Time remaining: " . (($_SESSION['mfa_expires'] ?? 0) - time()) . " seconds");
         error_log("Attempts: " . ($_SESSION['mfa_attempts'] ?? '0'));
         
-        if (empty($code)) {
+        // Check if account is locked before processing
+        $lockout_status = MFAHelper::getLockoutStatus(
+            $conn, 
+            $_SESSION['mfa_pending_user']['userid'], 
+            $_SESSION['mfa_pending_user']['email'], 
+            $_SESSION['mfa_pending_user']['role']
+        );
+        
+        if ($lockout_status['locked']) {
+            $error = 'Your account has been locked due to too many failed attempts. Please try again in ' . $lockout_status['minutes_remaining'] . ' minutes.';
+            error_log("MFA BLOCKED: Account is locked");
+        } elseif (empty($code)) {
             $error = 'Please enter the verification code';
             error_log("MFA FAIL: Empty code");
         } else {
@@ -178,6 +203,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // SIMPLE VALIDATION - Only check if codes match
             if ($code === $session_code) {
                 error_log("SIMPLE VALIDATION SUCCESS - Codes match!");
+                
+                // Unlock account if it was previously locked (successful login)
+                MFAHelper::unlockAccount(
+                    $conn, 
+                    $_SESSION['mfa_pending_user']['userid'], 
+                    $_SESSION['mfa_pending_user']['email'], 
+                    $_SESSION['mfa_pending_user']['role']
+                );
                 
                 // MFA successful - complete login
                 $_SESSION['UserAuthData'] = $_SESSION['mfa_pending_user'];
@@ -209,13 +242,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Invalid verification code. Please try again.';
                 error_log("SIMPLE VALIDATION FAILED - Codes don't match");
                 error_log("Entered: '$code' vs Session: '$session_code'");
+                error_log("Attempt: " . $_SESSION['mfa_attempts'] . "/3");
                 
                 // Check if max attempts reached
                 if ($_SESSION['mfa_attempts'] >= 3) {
-                    error_log("MFA FAIL: Max attempts reached");
-                    $error = 'Maximum verification attempts reached. Please try logging in again.';
+                    error_log("MFA FAIL: Max attempts reached - Locking account");
+                    
+                    // Record account lockout
+                    MFAHelper::recordLockout(
+                        $conn, 
+                        $_SESSION['mfa_pending_user']['userid'], 
+                        $_SESSION['mfa_pending_user']['email'], 
+                        $_SESSION['mfa_pending_user']['role'],
+                        'MFA Failed - 3 attempts'
+                    );
+                    
+                    $error = 'Maximum verification attempts reached. Your account has been locked for 30 minutes.';
                     session_destroy();
-                    header('Location: index.php?login-error=mfa_attempts');
+                    header('Location: index.php?login-error=locked&minutes=30');
                     exit();
                 }
             }
@@ -224,12 +268,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Resend code functionality
     if (isset($_POST['resend_code'])) {
-        error_log("Resending MFA code to: " . $email);
-        $new_code = MFAHelper::generateMFACode();
-        MFAHelper::storeMFACode($_SESSION['mfa_pending_user']['userid'], $new_code);
-        MFAHelper::sendMFACode($email, $new_code);
-        $error = 'New verification code sent to your email.';
-        error_log("New code generated: " . $new_code);
+        // Check if account is locked before resending
+        $lockout_status = MFAHelper::getLockoutStatus(
+            $conn, 
+            $_SESSION['mfa_pending_user']['userid'], 
+            $_SESSION['mfa_pending_user']['email'], 
+            $_SESSION['mfa_pending_user']['role']
+        );
+        
+        if ($lockout_status['locked']) {
+            $error = 'Your account is locked. Cannot resend code.';
+        } else {
+            error_log("Resending MFA code to: " . $email);
+            $new_code = MFAHelper::generateMFACode();
+            MFAHelper::storeMFACode($_SESSION['mfa_pending_user']['userid'], $new_code);
+            MFAHelper::sendMFACode($email, $new_code);
+            $error = 'New verification code sent to your email.';
+            error_log("New code generated: " . $new_code);
+        }
     }
 }
 
@@ -237,6 +293,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $remaining_time = $_SESSION['mfa_expires'] - time();
 $minutes_remaining = max(0, floor($remaining_time / 60));
 $seconds_remaining = max(0, $remaining_time % 60);
+
+// Check lockout status for display
+$lockout_status = MFAHelper::getLockoutStatus(
+    $conn, 
+    $_SESSION['mfa_pending_user']['userid'], 
+    $_SESSION['mfa_pending_user']['email'], 
+    $_SESSION['mfa_pending_user']['role']
+);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -283,6 +347,13 @@ $seconds_remaining = max(0, $remaining_time % 60);
             padding: 12px;
             font-weight: 600;
         }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+        }
         .timer {
             font-size: 14px;
             font-weight: bold;
@@ -292,6 +363,16 @@ $seconds_remaining = max(0, $remaining_time % 60);
             font-size: 14px;
             color: #ffc107;
             font-weight: bold;
+        }
+        .lockout-warning {
+            font-size: 14px;
+            color: #dc3545;
+            font-weight: bold;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
         }
         .debug-info {
             background: #f8f9fa;
@@ -315,6 +396,16 @@ $seconds_remaining = max(0, $remaining_time % 60);
                     <div class="card-body p-5">
                         <p class="text-center text-muted mb-4">We sent a verification code to:</p>
                         <p class="text-center fw-bold text-primary fs-5 mb-4"><?php echo htmlspecialchars($email); ?></p>
+                        
+                        <!-- Lockout Warning -->
+                        <?php if ($lockout_status['locked']): ?>
+                            <div class="lockout-warning text-center">
+                                <i class="fas fa-ban"></i>
+                                <strong>Account Locked</strong><br>
+                                Your account has been locked due to too many failed attempts.<br>
+                                Please try again in <?php echo $lockout_status['minutes_remaining']; ?> minutes.
+                            </div>
+                        <?php endif; ?>
                         
                         <!-- Time Remaining -->
                         <div class="text-center mb-3">
@@ -351,20 +442,27 @@ $seconds_remaining = max(0, $remaining_time % 60);
                                        autofocus
                                        pattern="[0-9]{6}"
                                        placeholder="000000"
-                                       title="Enter 6-digit code">
+                                       title="Enter 6-digit code"
+                                       <?php echo $lockout_status['locked'] ? 'disabled' : ''; ?>>
                                 <div class="form-text text-center mt-2">
                                     <i class="fas fa-key"></i> Enter the 6-digit code from your email
                                 </div>
                             </div>
                             
                             <div class="d-grid gap-2">
-                                <button type="submit" name="verify_code" class="btn btn-primary btn-lg">
+                                <button type="submit" name="verify_code" class="btn btn-primary btn-lg" <?php echo $lockout_status['locked'] ? 'disabled' : ''; ?>>
                                     <i class="fas fa-check-circle"></i> Verify & Continue
                                 </button>
                                 
-                                <button type="submit" name="resend_code" class="btn btn-outline-secondary btn-lg">
+                                <button type="submit" name="resend_code" class="btn btn-outline-secondary btn-lg" <?php echo $lockout_status['locked'] ? 'disabled' : ''; ?>>
                                     <i class="fas fa-redo"></i> Resend Code
                                 </button>
+                                
+                                <?php if ($lockout_status['locked']): ?>
+                                    <button type="button" class="btn btn-danger btn-lg" disabled>
+                                        <i class="fas fa-ban"></i> Account Locked
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         </form>
                         
@@ -382,6 +480,7 @@ $seconds_remaining = max(0, $remaining_time % 60);
                             <p><strong>Time Remaining:</strong> <?php echo $remaining_time; ?> seconds</p>
                             <p><strong>Attempts:</strong> <?php echo $_SESSION['mfa_attempts'] ?? 0; ?>/3</p>
                             <p><strong>User ID:</strong> <?php echo $_SESSION['mfa_pending_user']['userid'] ?? 'Not set'; ?></p>
+                            <p><strong>Lockout Status:</strong> <?php echo $lockout_status['locked'] ? 'LOCKED (' . $lockout_status['minutes_remaining'] . ' minutes remaining)' : 'Not Locked'; ?></p>
                         </div>
                     </div>
                 </div>
@@ -398,12 +497,7 @@ $seconds_remaining = max(0, $remaining_time % 60);
             // Auto-format code input (numbers only)
             mfaInput.addEventListener('input', function(e) {
                 this.value = this.value.replace(/[^0-9]/g, '');
-                
-                // Auto-submit when 6 digits are entered
-            //     if (this.value.length === 6) {
-            //         form.submit();
-            //     }
-            // });
+            });
             
             // Prevent form submission if less than 6 digits
             form.addEventListener('submit', function(e) {

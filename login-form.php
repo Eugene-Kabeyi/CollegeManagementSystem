@@ -33,9 +33,10 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 error_log("CSRF Token regenerated: " . $old_token . " -> " . $_SESSION['csrf_token']);
 
 // Function to get client IP address
-function getClientIP() {
+function getClientIP()
+{
     $ip_keys = ['HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_X_CLUSTER_CLIENT_IP', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED', 'REMOTE_ADDR'];
-    
+
     foreach ($ip_keys as $key) {
         if (array_key_exists($key, $_SERVER) === true) {
             foreach (explode(',', $_SERVER[$key]) as $ip) {
@@ -50,7 +51,8 @@ function getClientIP() {
 }
 
 // Function to get browser information
-function getBrowserInfo() {
+function getBrowserInfo()
+{
     $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
     $browser = "Unknown";
     $os = "Unknown";
@@ -105,15 +107,16 @@ function getBrowserInfo() {
 }
 
 // Function to write login log
-function writeLoginLog($conn, $userid, $userrole, $status) {
+function writeLoginLog($conn, $userid, $userrole, $status)
+{
     try {
         $ip = getClientIP();
         $browserInfo = getBrowserInfo();
-        
+
         $stmt = $conn->prepare("INSERT INTO `log_login` 
             (ip, os, browser, userid, userrole, timestamp) 
             VALUES (:ip, :os, :browser, :userid, :userrole, NOW())");
-        
+
         $stmt->execute([
             ':ip' => $ip,
             ':os' => $browserInfo['os'],
@@ -121,7 +124,7 @@ function writeLoginLog($conn, $userid, $userrole, $status) {
             ':userid' => $userid,
             ':userrole' => $userrole
         ]);
-        
+
         return true;
     } catch (PDOException $e) {
         error_log("Login log error: " . $e->getMessage());
@@ -130,12 +133,14 @@ function writeLoginLog($conn, $userid, $userrole, $status) {
 }
 
 // Function to validate email format
-function isValidEmail($email) {
+function isValidEmail($email)
+{
     return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
 }
 
 // Function to sanitize input
-function sanitizeInput($data) {
+function sanitizeInput($data)
+{
     return trim(htmlspecialchars(strip_tags($data)));
 }
 
@@ -166,7 +171,7 @@ if (!isValidEmail($LoginEmail)) {
 
 $allowedRoles = [
     'admin' => 'login_admin',
-    'staff' => 'login_staff', 
+    'staff' => 'login_staff',
     'student' => 'login_student',
     'principal' => 'login_college_admin',
     'manager' => 'login_college_admin'
@@ -195,7 +200,7 @@ try {
         $params = [$LoginEmail];
         error_log("Query for other roles: " . $query . " with param: " . $params[0]);
     }
-    
+
     $stmt = $conn->prepare($query);
     $stmt->execute($params);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -217,81 +222,98 @@ try {
         header('Location: index.php?login-error=password');
         exit;
     }
+    // After successful password verification - check if account is locked
+    error_log("=== LOCKOUT CHECK IN LOGIN-FORM ===");
+    $lockout_status = MFAHelper::getLockoutStatus($conn, $userid, $user['email'], $actualRole);
+    error_log("Lockout status: " . print_r($lockout_status, true));
 
-    // Successful password verification - now initiate MFA
-    $userid = $user['userid'] ?? $user['email'];
-    $actualRole = $user['role'] ?? $LoginRole;
-    
-    error_log("Password verified successfully for user: " . $userid . " with role: " . $actualRole);
-    
-    // Clear any existing MFA session to prevent conflicts
-    if (isset($_SESSION['mfa_pending_user'])) {
-        unset($_SESSION['mfa_pending_user']);
-    }
-    MFAHelper::clearMFASession();
+    // Also check directly with isAccountLocked
+    $direct_lockout = MFAHelper::isAccountLocked($conn, $userid, $user['email'], $actualRole);
+    error_log("Direct isAccountLocked result: " . ($direct_lockout ? 'LOCKED' : 'NOT LOCKED'));
 
-    // Generate and store MFA code
-    $mfa_code = MFAHelper::generateMFACode();
-    MFAHelper::storeMFACode($userid, $mfa_code);
-
-    error_log("MFA code generated: " . $mfa_code . " for user: " . $userid);
-
-    // Store user data temporarily for MFA verification
-    $_SESSION['mfa_pending_user'] = [
-        'userid' => $userid,
-        'name' => $user['name'] ?? 'Unknown',
-        'email' => $user['email'],
-        'role' => $actualRole,
-        'login_time' => time(),
-        'table_source' => $LoginTable
-    ];
-
-    // Add role-specific data to pending session
-    switch ($actualRole) {
-        case 'staff':
-        case 'hod':
-            $_SESSION['mfa_pending_user']['type'] = $user['type'] ?? '';
-            $_SESSION['mfa_pending_user']['department'] = $user['department'] ?? '';
-            $_SESSION['mfa_pending_user']['designation'] = $user['designation'] ?? '';
-            break;
-            
-        case 'student':
-            $_SESSION['mfa_pending_user']['department'] = $user['department'] ?? '';
-            $_SESSION['mfa_pending_user']['admission_number'] = $user['admission_number'] ?? '';
-            $_SESSION['mfa_pending_user']['year_of_admission'] = $user['year_of_admission'] ?? '';
-            break;
-            
-        case 'principal':
-        case 'manager':
-            $_SESSION['mfa_pending_user']['phone'] = $user['phone'] ?? '';
-            break;
-            
-        case 'admin':
-            $_SESSION['mfa_pending_user']['phone'] = $user['phone'] ?? '';
-            break;
-    }
-
-    error_log("MFA pending user session created: " . print_r($_SESSION['mfa_pending_user'], true));
-    error_log("MFA session data - code: " . ($_SESSION['mfa_code'] ?? 'NOT SET') . ", expires: " . ($_SESSION['mfa_expires'] ?? 'NOT SET'));
-
-    // Log MFA initiation
-    writeLoginLog($conn, $userid, $actualRole, 'Success - MFA Initiated');
-
-    // Send MFA code via email
-    error_log("Attempting to send MFA email to: " . $user['email']);
-    $email_sent = MFAHelper::sendMFACode($user['email'], $mfa_code);
-    
-    if ($email_sent) {
-        error_log("MFA email sent successfully to: " . $user['email']);
-        header('Location: mfa_verify.php');
+    if ($lockout_status['locked']) {
+        error_log("Login blocked: Account locked for user: " . $userid);
+        writeLoginLog($conn, $userid, $actualRole, 'Failed - Account Locked');
+        header('Location: index.php?login-error=locked&minutes=' . $lockout_status['minutes_remaining']);
+        exit;
     } else {
-        error_log("MFA email failed to send to: " . $user['email']);
-        // If email fails, still redirect to MFA page but log the code for debugging
-        error_log("MFA Code for " . $user['email'] . ": " . $mfa_code);
-        header('Location: mfa_verify.php');
-    }
-    exit;
 
+        // Continue with MFA if account is not locked...
+
+        // Successful password verification - now initiate MFA
+        $userid = $user['userid'] ?? $user['email'];
+        $actualRole = $user['role'] ?? $LoginRole;
+
+        error_log("Password verified successfully for user: " . $userid . " with role: " . $actualRole);
+
+        // Clear any existing MFA session to prevent conflicts
+        if (isset($_SESSION['mfa_pending_user'])) {
+            unset($_SESSION['mfa_pending_user']);
+        }
+        MFAHelper::clearMFASession();
+
+        // Generate and store MFA code
+        $mfa_code = MFAHelper::generateMFACode();
+        MFAHelper::storeMFACode($userid, $mfa_code);
+
+        error_log("MFA code generated: " . $mfa_code . " for user: " . $userid);
+
+        // Store user data temporarily for MFA verification
+        $_SESSION['mfa_pending_user'] = [
+            'userid' => $userid,
+            'name' => $user['name'] ?? 'Unknown',
+            'email' => $user['email'],
+            'role' => $actualRole,
+            'login_time' => time(),
+            'table_source' => $LoginTable
+        ];
+
+        // Add role-specific data to pending session
+        switch ($actualRole) {
+            case 'staff':
+            case 'hod':
+                $_SESSION['mfa_pending_user']['type'] = $user['type'] ?? '';
+                $_SESSION['mfa_pending_user']['department'] = $user['department'] ?? '';
+                $_SESSION['mfa_pending_user']['designation'] = $user['designation'] ?? '';
+                break;
+
+            case 'student':
+                $_SESSION['mfa_pending_user']['department'] = $user['department'] ?? '';
+                $_SESSION['mfa_pending_user']['admission_number'] = $user['admission_number'] ?? '';
+                $_SESSION['mfa_pending_user']['year_of_admission'] = $user['year_of_admission'] ?? '';
+                break;
+
+            case 'principal':
+            case 'manager':
+                $_SESSION['mfa_pending_user']['phone'] = $user['phone'] ?? '';
+                break;
+
+            case 'admin':
+                $_SESSION['mfa_pending_user']['phone'] = $user['phone'] ?? '';
+                break;
+        }
+
+        error_log("MFA pending user session created: " . print_r($_SESSION['mfa_pending_user'], true));
+        error_log("MFA session data - code: " . ($_SESSION['mfa_code'] ?? 'NOT SET') . ", expires: " . ($_SESSION['mfa_expires'] ?? 'NOT SET'));
+
+        // Log MFA initiation
+        writeLoginLog($conn, $userid, $actualRole, 'Success - MFA Initiated');
+
+        // Send MFA code via email
+        error_log("Attempting to send MFA email to: " . $user['email']);
+        $email_sent = MFAHelper::sendMFACode($user['email'], $mfa_code);
+
+        if ($email_sent) {
+            error_log("MFA email sent successfully to: " . $user['email']);
+            header('Location: mfa_verify.php');
+        } else {
+            error_log("MFA email failed to send to: " . $user['email']);
+            // If email fails, still redirect to MFA page but log the code for debugging
+            error_log("MFA Code for " . $user['email'] . ": " . $mfa_code);
+            header('Location: mfa_verify.php');
+        }
+        exit;
+    }
 } catch (PDOException $e) {
     error_log("Login database error: " . $e->getMessage());
     error_log("Database error details: " . $e->getTraceAsString());

@@ -42,14 +42,15 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Profile</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="../student_dashboard.php">CEA Student Portal</a>
+            <a class="navbar-brand" href="../student_dashboard.php"><i class="fas fa-graduation-cap"> </i><strong>CEA Student Portal</strong></a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="../student_dashboard.php">Dashboard</a>
-                <a class="nav-link" href="../logout.php">Logout</a>
+                <a class="nav-link" href="../student_dashboard.php"><i class="fas fa-tachometer-alt"></i> <strong>Dashboard</strong></a>
+                <a class="nav-link text-danger" href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
         </div>
     </nav>
