@@ -1,6 +1,36 @@
 <?php
 session_start();
 include_once(__DIR__ . '/config.php'); // config.php must define $conn as PDO
+include_once(__DIR__ . '/mfa_helper.php'); // Include MFA helper
+
+error_log("=== LOGIN FORM DEBUG ===");
+error_log("Session ID: " . session_id());
+error_log("Session CSRF Token: " . ($_SESSION['csrf_token'] ?? 'NOT SET'));
+error_log("Posted CSRF Token: " . ($_POST['csrf_token'] ?? 'NOT POSTED'));
+
+// CSRF Token Validation
+if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token'])) {
+    error_log("CSRF FAIL: Missing tokens");
+    unset($_SESSION['csrf_token']);
+    header('Location: index.php?login-error=csrf');
+    exit;
+}
+
+if ($_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    error_log("CSRF FAIL: Token mismatch");
+    error_log("Session: " . $_SESSION['csrf_token']);
+    error_log("Posted: " . $_POST['csrf_token']);
+    unset($_SESSION['csrf_token']);
+    header('Location: index.php?login-error=csrf');
+    exit;
+}
+
+// CSRF validation successful - regenerate token
+error_log("CSRF SUCCESS: Tokens match");
+$old_token = $_SESSION['csrf_token'];
+unset($_SESSION['csrf_token']);
+$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+error_log("CSRF Token regenerated: " . $old_token . " -> " . $_SESSION['csrf_token']);
 
 // Function to get client IP address
 function getClientIP() {
@@ -115,11 +145,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['login-submit'])) {
     exit;
 }
 
-// Validate CSRF token if implemented
-if (isset($_SESSION['csrf_token']) && (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token'])) {
-    header('Location: index.php?login-error=csrf');
-    exit;
-}
 
 // Sanitize inputs
 $LoginEmail = sanitizeInput($_POST['login-email']);
@@ -182,71 +207,58 @@ try {
         exit;
     }
 
-    // Successful login
+    // Successful password verification - now initiate MFA
     $userid = $user['userid'] ?? $user['email'];
     $actualRole = $user['role'] ?? $LoginRole;
     
-    // Log successful login
-    writeLoginLog($conn, $userid, $actualRole, 'Success');
+    // Generate and store MFA code
+    $mfa_code = MFAHelper::generateMFACode();
+    MFAHelper::storeMFACode($userid, $mfa_code);
 
-    // Set session data based on role
-    $UserAuthData = [
-        'status' => 'valid',
-        'email' => $user['email'],
+    // Store user data temporarily for MFA verification
+    $_SESSION['mfa_pending_user'] = [
         'userid' => $userid,
         'name' => $user['name'],
+        'email' => $user['email'],
         'role' => $actualRole,
         'login_time' => time()
     ];
 
-    // Add role-specific data
+    // Add role-specific data to pending session
     switch ($actualRole) {
         case 'staff':
         case 'hod':
-            $UserAuthData['type'] = $user['type'] ?? '';
-            $UserAuthData['department'] = $user['department'] ?? '';
-            $UserAuthData['designation'] = $user['designation'] ?? '';
+            $_SESSION['mfa_pending_user']['type'] = $user['type'] ?? '';
+            $_SESSION['mfa_pending_user']['department'] = $user['department'] ?? '';
+            $_SESSION['mfa_pending_user']['designation'] = $user['designation'] ?? '';
             break;
             
         case 'student':
-            $UserAuthData['department'] = $user['department'] ?? '';
-            $UserAuthData['admission_number'] = $user['admission_number'] ?? '';
-            $UserAuthData['year_of_admission'] = $user['year_of_admission'] ?? '';
+            $_SESSION['mfa_pending_user']['department'] = $user['department'] ?? '';
+            $_SESSION['mfa_pending_user']['admission_number'] = $user['admission_number'] ?? '';
+            $_SESSION['mfa_pending_user']['year_of_admission'] = $user['year_of_admission'] ?? '';
             break;
             
         case 'principal':
         case 'manager':
-            $UserAuthData['phone'] = $user['phone'] ?? '';
+            $_SESSION['mfa_pending_user']['phone'] = $user['phone'] ?? '';
             break;
             
         case 'admin':
-            $UserAuthData['phone'] = $user['phone'] ?? '';
+            $_SESSION['mfa_pending_user']['phone'] = $user['phone'] ?? '';
             break;
     }
 
-    $_SESSION['UserAuthData'] = $UserAuthData;
+    // Log MFA initiation
+    writeLoginLog($conn, $userid, $actualRole, 'Success - MFA Initiated');
 
-    // Regenerate session ID for security
-    session_regenerate_id(true);
-
-    // Redirect to appropriate dashboard
-    switch ($actualRole) {
-        case 'student':
-            header('Location: student_dashboard.php');
-            break;
-        case 'staff':
-        case 'hod':
-            header('Location: staff_dashboard.php');
-            break;
-        case 'principal':
-        case 'manager':
-            header('Location: college_admin_dashboard.php');
-            break;
-        case 'admin':
-            header('Location: dashboard.php');
-            break;
-        default:
-            header('Location: dashboard.php');
+    // Send MFA code via email
+    if (MFAHelper::sendMFACode($user['email'], $mfa_code)) {
+        header('Location: mfa_verify.php');
+    } else {
+        // If email fails, log the code for debugging (remove in production)
+        error_log("MFA Code for {$user['email']}: {$mfa_code}");
+        header('Location: mfa_verify.php');
     }
     exit;
 

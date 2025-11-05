@@ -2,6 +2,11 @@
 session_start();
 include_once('header.php');
 
+// Generate CSRF token if not exists
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Handle error messages from login-form.php via GET
 $errorMessage = '';
 
@@ -18,6 +23,9 @@ if (isset($_GET['login-error'])) {
             break;
         case 'database':
             $errorMessage = "Database error. Please try again later.";
+            break;
+        case 'csrf':
+            $errorMessage = "Security token invalid. Please try again.";
             break;
         default:
             $errorMessage = "Login failed. Please try again.";
@@ -40,12 +48,13 @@ if (isset($_GET['login-error'])) {
                 <h6><b>Welcome.</b> Sign in to get started!</h6>
 
                 <?php if (!empty($errorMessage)): ?>
-                  <div style="color:red; margin-bottom:10px;">
+                  <div class="alert alert-danger" role="alert">
                     <?php echo htmlspecialchars($errorMessage); ?>
                   </div>
                 <?php endif; ?>
 
                 <form action="login-form.php" method="post" enctype="application/x-www-form-urlencoded">
+                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                   <div class="form-group">
                     <input type="email" name="login-email" class="form-control" placeholder="Enter Your E-Mail address" required>
                   </div>
