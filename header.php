@@ -1,5 +1,8 @@
 <?php
 session_start();
+include_once('session_manager.php');
+SessionManager::start(30); // 30 minutes timeout
+
 ?>
 <html>
 <head>
@@ -36,7 +39,7 @@ session_start();
                <?php echo htmlspecialchars($UserAuthData['name']); ?> <span class="caret"></span>
            </a>
            <ul class="dropdown-menu" role="menu">
-            <li><a href="#">Manage Account</a></li>
+            <li><a href="change_password.php">Change Password</a></li>
             <li><a href="logout.php">Logout</a></li>
            </ul>
           </li>

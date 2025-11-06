@@ -161,21 +161,32 @@ $has_subjects = count($subjects) > 0;
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="student_dashboard.php">
-                <i class="fas fa-graduation-cap"></i> CEA Student Portal
+   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="student_dashboard.php">
+            <i class="fas fa-graduation-cap"></i> CEA Student Portal
+        </a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="../student_dashboard.php">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
             </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="../student_dashboard.php">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-cog"></i> Account
                 </a>
-                <a class="nav-link" href="../logout.php">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                    <li><a class="dropdown-item" href="../change_password.php">
+                        <i class="fas fa-key me-2"></i> Change Password
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="../logout.php">
+                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                    </a></li>
+                </ul>
             </div>
         </div>
-    </nav>
+    </div>
+</nav>
 
     <div class="container mt-4">
         <!-- Registration Messages -->

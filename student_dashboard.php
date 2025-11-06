@@ -3,7 +3,8 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
+include_once('session_manager.php');
+SessionManager::start(30); // 30 minutes timeout
 session_start();
 
 // Debug: Check what's in session
@@ -25,6 +26,7 @@ $student_email = $UserAuthData['email'] ?? 'Unknown';
 $student_department = $UserAuthData['department'] ?? 'Unknown';
 $admission_number = $UserAuthData['admission_number'] ?? 'Unknown';
 $year_of_admission = $UserAuthData['year_of_admission'] ?? 'Unknown';
+$_SESSION['UserAuthData']['role'] == 'student';
 
 include_once(__DIR__ . '/config.php'); // This should define $conn, not $pdo
 
@@ -48,14 +50,26 @@ include_once(__DIR__ . '/config.php'); // This should define $conn, not $pdo
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="#"><i class="fas fa-graduation-cap"></i>CEA Student Portal</a>
-            <div class="navbar-nav ms-auto ">
-                <span class="navbar-text me-3 ">Welcome, <?php echo htmlspecialchars($student_name); ?></span>
-                <a class="nav-link text-danger" href="logout.php"> <i class="fas fa-sign-out-alt"></i>Logout</a>
+    <div class="container">
+        <a class="navbar-brand" href="#"><i class="fas fa-graduation-cap"></i>CEA Student Portal</a>
+        <div class="navbar-nav ms-auto">
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle text-white" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-circle me-1"></i><?php echo htmlspecialchars($student_name); ?>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                    <li><a class="dropdown-item" href="change_password.php">
+                        <i class="fas fa-key me-2"></i> Change Password
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="logout.php">
+                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                    </a></li>
+                </ul>
             </div>
         </div>
-    </nav>
+    </div>
+</nav>
 
     <div class="container mt-4">
         <div class="row">

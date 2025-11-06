@@ -4,6 +4,8 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+include_once('session_manager.php');
+SessionManager::start(30); // 30 minutes timeout
 session_start();
 
 // Debug: Check what's in session
@@ -45,16 +47,32 @@ try {
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="../student_dashboard.php"><i class="fas fa-graduation-cap"> </i><strong>CEA Student Portal</strong></a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="../student_dashboard.php"><i class="fas fa-tachometer-alt"></i> <strong>Dashboard</strong></a>
-                <a class="nav-link text-danger" href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="student_dashboard.php">
+            <i class="fas fa-graduation-cap"></i> CEA Student Portal
+        </a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="../student_dashboard.php">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-cog"></i> Account
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                    <li><a class="dropdown-item" href="../change_password.php">
+                        <i class="fas fa-key me-2"></i> Change Password
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="../logout.php">
+                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                    </a></li>
+                </ul>
             </div>
         </div>
-    </nav>
-
+    </div>
+</nav>
     <div class="container mt-4">
         <div class="row">
             <div class="col-md-8 mx-auto">
