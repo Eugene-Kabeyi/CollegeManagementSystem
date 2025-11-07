@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 include_once('session_manager.php');
 SessionManager::start(30); // 30 minutes timeout
 

@@ -3,9 +3,13 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
 include_once('session_manager.php');
 SessionManager::start(30); // 30 minutes timeout
-session_start();
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Debug: Check what's in session
 error_log("Session data: " . print_r($_SESSION, true));

@@ -3,9 +3,12 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+include_once('session_manager.php');
+SessionManager::start(30); // 30 minutes timeout
 
-session_start();
-
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 // Check if user is logged in as student
 if (!isset($_SESSION['UserAuthData']) || $_SESSION['UserAuthData']['role'] != 'student') {
     header("Location: ../index.php");
