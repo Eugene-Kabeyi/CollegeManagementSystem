@@ -52,7 +52,7 @@ class MFAHelper {
     }
     
     public static function sendMFACode($email, $code) {
-        $from_email = "genedyce238@gmail.com";
+        $from_email = "example@mail.com";
         
         $subject = "Your CEA Login Verification Code";
         $message = "
