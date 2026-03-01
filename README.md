@@ -1,7 +1,7 @@
 # CollegeManagementSystem
 Fully functional college and student management system for engineering colleges.
 
-###Added Security Patches
+### Added Security Patches
 🔐 Security Enhancements Implemented
 
 This project was forked and improved with enterprise-level backend security practices:
@@ -24,7 +24,7 @@ This project was forked and improved with enterprise-level backend security prac
 
 ✅ Role-Based Access Control (RBAC)
 
-###🛡️ Security Vulnerabilities Mitigated
+### 🛡️ Security Vulnerabilities Mitigated
 Vulnerability	Solution Implemented
 SQL Injection	PDO Prepared Statements
 Session Hijacking	Regenerated Session IDs
